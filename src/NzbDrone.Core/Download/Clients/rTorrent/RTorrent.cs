@@ -147,7 +147,10 @@ namespace NzbDrone.Core.Download.Clients.RTorrent
                     item.Status = DownloadItemStatus.Paused;
                 }
 
-                item.CanMoveFiles = item.CanBeRemoved = torrent.IsSeeded;
+                item.CanMoveFiles = item.CanBeRemoved =
+                    torrent.IsSeeded &&
+                    torrent.IsFinished &&
+                    !torrent.IsActive;
 
                 items.Add(item);
             }
