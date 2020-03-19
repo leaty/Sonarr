@@ -87,7 +87,8 @@ namespace NzbDrone.Core.Download.Clients.RTorrent
                     "d.ratio=", // long
                     "d.is_open=", // long
                     "d.is_active=", // long
-                    "d.complete=") //long
+                    "d.complete=", // long
+                    "d.views.has=seeded") //long
             );
 
             var items = new List<RTorrentTorrent>();
@@ -108,6 +109,7 @@ namespace NzbDrone.Core.Download.Clients.RTorrent
                 item.IsOpen = Convert.ToBoolean((long)torrent[8]);
                 item.IsActive = Convert.ToBoolean((long)torrent[9]);
                 item.IsFinished = Convert.ToBoolean((long)torrent[10]);
+                item.IsSeeded = Convert.ToBoolean((long)torrent[11]);
 
                 items.Add(item);
             }

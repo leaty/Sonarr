@@ -11,6 +11,7 @@
         public long DownRate { get; set; }
         public long Ratio { get; set; }
         public bool IsFinished { get; set; }
+        public bool IsSeeded { get; set; }
         public bool IsOpen { get; set; }
         public bool IsActive { get; set; }
     }

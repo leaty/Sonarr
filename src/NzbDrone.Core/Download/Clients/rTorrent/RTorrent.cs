@@ -95,7 +95,7 @@ namespace NzbDrone.Core.Download.Clients.RTorrent
 
         public override string Name => "rTorrent";
 
-        public override ProviderMessage Message => new ProviderMessage("Sonarr is unable to remove torrents that have finished seeding when using rTorrent", ProviderMessageType.Warning);
+        public override ProviderMessage Message => new ProviderMessage("Sonarr requires finished torrents to be visible in a view called \"seeded\" in order to automatically remove them from rTorrent.", ProviderMessageType.Info);
 
         public override IEnumerable<DownloadClientItem> GetItems()
         {
@@ -147,8 +147,7 @@ namespace NzbDrone.Core.Download.Clients.RTorrent
                     item.Status = DownloadItemStatus.Paused;
                 }
 
-                // No stop ratio data is present, so do not delete
-                item.CanMoveFiles = item.CanBeRemoved = false;
+                item.CanMoveFiles = item.CanBeRemoved = torrent.IsSeeded;
 
                 items.Add(item);
             }
