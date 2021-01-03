@@ -19,6 +19,7 @@ namespace NzbDrone.Core.Download.Clients.RTorrent
         void AddTorrentFromFile(string fileName, byte[] fileContent, string label, RTorrentPriority priority, string directory, RTorrentSettings settings);
         void RemoveTorrent(string hash, RTorrentSettings settings);
         void SetTorrentLabel(string hash, string label, RTorrentSettings settings);
+        void SetTorrentSeedingConfiguration(string hash, TorrentSeedConfiguration seedConfiguration, RTorrentSettings settings);
         bool HasHashTorrent(string hash, RTorrentSettings settings);
     }
 
@@ -48,6 +49,9 @@ namespace NzbDrone.Core.Download.Clients.RTorrent
         [XmlRpcMethod("d.custom1.set")]
         string SetLabel(string hash, string label);
 
+        [XmlRpcMethod("d.views.push_back_unique")]
+        int PushUniqueView(string hash, string view);
+
         [XmlRpcMethod("system.client_version")]
         string GetVersion();
     }
@@ -55,6 +59,8 @@ namespace NzbDrone.Core.Download.Clients.RTorrent
     public class RTorrentProxy : IRTorrentProxy
     {
         private readonly Logger _logger;
+        private readonly string _viewRatio = "sonarr_seed_ratio_";
+        private readonly string _viewTime = "sonarr_seed_time_";
 
         public RTorrentProxy(Logger logger)
         {
@@ -88,7 +94,8 @@ namespace NzbDrone.Core.Download.Clients.RTorrent
                     "d.is_open=", // long
                     "d.is_active=", // long
                     "d.complete=", // long
-                    "d.views.has=seeded") //long
+                    "d.timestamp.finished=", // long (unix timestamp)
+                    "d.views=") // array of strings
             );
 
             var items = new List<RTorrentTorrent>();
@@ -109,7 +116,26 @@ namespace NzbDrone.Core.Download.Clients.RTorrent
                 item.IsOpen = Convert.ToBoolean((long)torrent[8]);
                 item.IsActive = Convert.ToBoolean((long)torrent[9]);
                 item.IsFinished = Convert.ToBoolean((long)torrent[10]);
-                item.IsSeeded = Convert.ToBoolean((long)torrent[11]);
+                item.FinishedTime = (long)torrent[11];
+
+                // Lookup seed config in torrent views
+                var views = torrent[12] as string[];
+                if (views != null)
+                {
+                    foreach (var view in views)
+                    {
+                        if (view.StartsWith(_viewRatio))
+                        {
+                            item.StopAtRatio = true;
+                            item.StopRatio = Convert.ToDouble(view.Split('_')[3]);
+                        }
+                        else if (view.StartsWith(_viewTime))
+                        {
+                            item.StopAtTime = true;
+                            item.StopTime = Convert.ToInt64(view.Split('_')[3]);
+                        }
+                    }
+                }
 
                 items.Add(item);
             }
@@ -173,6 +199,34 @@ namespace NzbDrone.Core.Download.Clients.RTorrent
             if (response != label)
             {
                 throw new DownloadClientException("Could not set label to {1} for torrent: {0}.", hash, label);
+            }
+        }
+
+        public void SetTorrentSeedingConfiguration(string hash, TorrentSeedConfiguration seedConfiguration, RTorrentSettings settings)
+        {
+            var client = BuildClient(settings);
+
+            if (seedConfiguration.Ratio != null)
+            {
+                var view = String.Format("{0}{1}", _viewRatio, seedConfiguration.Ratio);
+                PushTorrentUniqueView(hash, view, client);
+            }
+
+            if (seedConfiguration.SeedTime != null)
+            {
+                var view = String.Format("{0}{1}", _viewTime, seedConfiguration.SeedTime.Value.TotalMinutes);
+                PushTorrentUniqueView(hash, view, client);
+            }
+        }
+
+        public void PushTorrentUniqueView(string hash, string view, IRTorrent client)
+        {
+            _logger.Debug("Executing remote method: d.views.push_back_unique");
+
+            var response = ExecuteRequest(() => client.PushUniqueView(hash, view));
+            if (response != 0)
+            {
+                throw new DownloadClientException("Could not push unique view {0} for torrent: {1}.", view, hash);
             }
         }
 

@@ -10,8 +10,12 @@
         public long RemainingSize { get; set; }
         public long DownRate { get; set; }
         public long Ratio { get; set; }
+        public bool StopAtRatio { get; set; }
+        public bool StopAtTime { get; set; }
+        public double StopRatio { get; set; }
+        public long StopTime { get; set; }
+        public long FinishedTime { get; set; }
         public bool IsFinished { get; set; }
-        public bool IsSeeded { get; set; }
         public bool IsOpen { get; set; }
         public bool IsActive { get; set; }
     }

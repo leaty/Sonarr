@@ -72,6 +72,8 @@ namespace NzbDrone.Core.Download.Clients.RTorrent
                 return hash;
             }
 
+            _proxy.SetTorrentSeedingConfiguration(hash, remoteEpisode.SeedConfiguration, Settings);
+
             return hash;
         }
 
@@ -90,12 +92,14 @@ namespace NzbDrone.Core.Download.Clients.RTorrent
                 throw new ReleaseDownloadException(remoteEpisode.Release, "Downloading torrent failed");
             }
 
+            _proxy.SetTorrentSeedingConfiguration(hash, remoteEpisode.SeedConfiguration, Settings);
+
             return hash;
         }
 
         public override string Name => "rTorrent";
 
-        public override ProviderMessage Message => new ProviderMessage("Sonarr requires finished torrents to be visible in a view called \"seeded\" in order to automatically remove them from rTorrent.", ProviderMessageType.Info);
+        public override ProviderMessage Message => new ProviderMessage("Automatic torrent removal in rTorrent is done according to indexer-specific seeding rules. However, Sonarr is unable to know if you want to ignore said rules and continue seeding a torrent. You may counter this by removing the sonarr label on said torrent, preferably before your seeding limits are reached of course.", ProviderMessageType.Info);
 
         public override IEnumerable<DownloadClientItem> GetItems()
         {
@@ -148,9 +152,12 @@ namespace NzbDrone.Core.Download.Clients.RTorrent
                 }
 
                 item.CanMoveFiles = item.CanBeRemoved =
-                    torrent.IsSeeded &&
                     torrent.IsFinished &&
-                    !torrent.IsActive;
+                    (
+                        (torrent.StopAtRatio && (torrent.Ratio / 100 >= torrent.StopRatio)) ||
+                        (torrent.StopAtTime && torrent.FinishedTime > 0 &&
+                            ((DateTimeOffset.Now - DateTimeOffset.FromUnixTimeSeconds(torrent.FinishedTime)).TotalMinutes >= torrent.StopTime))
+                    );
 
                 items.Add(item);
             }
